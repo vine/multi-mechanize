@@ -179,6 +179,8 @@ def main():
     parser.add_option("-r", "--rampup", dest="rampup",
                   help="Duration to start total number of clients")
     (options, args) = parser.parse_args()
+    if not (options.NODES or options.clients or options.run_time or options.rampup):
+        parser.error("Required Field Missing!")
     hosts = [(host_port.split(':')[0], host_port.split(':')[1]) for host_port in options.NODES.split(',')]
     root = Tkinter.Tk()
     app = Application(root,hosts,options.clients,options.run_time,options.rampup)
