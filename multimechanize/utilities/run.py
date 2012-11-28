@@ -62,7 +62,7 @@ def main():
         rerun_results(project_name, cmd_opts, cmd_opts.results_dir)
     elif cmd_opts.port:
         import multimechanize.rpcserver
-        multimechanize.rpcserver.launch_rpc_server(cmd_opts.bind_addr, cmd_opts.port, project_name, run_test)
+        multimechanize.rpcserver.launch_rpc_server(cmd_opts.bind_addr, cmd_opts.port,project_name, cmd_opts,run_test)
     else:
         run_test(project_name, cmd_opts)
     return
