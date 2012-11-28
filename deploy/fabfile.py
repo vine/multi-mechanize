@@ -25,5 +25,5 @@ def deploy():
     
     with cd('/tmp/%s' % dist):
         with settings(hide('stdout', 'stderr'), warn_only=True):
-            run('sudo python /tmp/%s/setup.py install' % dist)
-    run('sudo rm -Rf /tmp/%s' % dist)
+            sudo('python /tmp/%s/setup.py install' % dist)
+    sudo('rm -Rf /tmp/%s' % dist)
