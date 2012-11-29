@@ -49,6 +49,11 @@ class RemoteControl(object):
             f.write(config)
             return True
 
+    def upload_test(self,content):
+        with open('%s/test_scripts/uploaded_test.py' % self.project_name, 'w') as f:
+            f.write(content)
+            return True        
+
     def get_config(self):
         with open('%s/config.cfg' % self.project_name, 'r') as f:
             return f.read()

@@ -33,25 +33,31 @@ NODES = [
 
 
 class Application:
-    def __init__(self, root, hosts,clients,run_time,rampup = 30):
+    def __init__(self, root, hosts,clients,run_time,rampup = 30,script = "apiclient.py",groups = 1):
         self.hosts = hosts
         self.root = root
+        self.groups = groups
         self.clients = int(clients)
         self.run_time = int(run_time)
+        self.script = script
         self.rampup = int(rampup)
         self.num_clients = (self.clients / len(self.hosts))
         self.root.geometry('%dx%d%+d%+d' % (600, 400, 100, 100))
         self.root.title('Multi-Mechanize Grid Controller')
-
+        self.results_ts_interval = 10
+        self.progress_bar = "on"
+        self.console_logging = "off"
+        self.xml_report = "off"
         Tkinter.Button(self.root, text='List Nodes', command=self.list_nodes, width=15,).place(x=5, y=5)
         Tkinter.Button(self.root, text='Check Tests', command=self.check_servers, width=15,).place(x=5, y=35)
         Tkinter.Button(self.root, text='Get Project Names', command=self.get_project_names, width=15).place(x=5, y=65)
         Tkinter.Button(self.root, text='Get Configs', command=self.get_configs, width=15).place(x=5, y=95)
         Tkinter.Button(self.root, text='Load Config File', command=self.loadfile_config, width=15).place(x=5, y=125)
-        Tkinter.Button(self.root, text='Get Results', command=self.get_results, width=15).place(x=5, y=155)
-        Tkinter.Button(self.root, text='Gen Config', command=self.generate_config, width=15).place(x=5, y=185)
-        Tkinter.Button(self.root, text='Push Config', command=self.push_config, width=15).place(x=5, y=215)
-        Tkinter.Button(self.root, text='Run Tests', command=self.run_tests, width=15).place(x=5, y=245)
+        Tkinter.Button(self.root, text='Upload Test File', command=self.uploadtest_script, width=15).place(x=5, y=155)
+        Tkinter.Button(self.root, text='Get Results', command=self.get_results, width=15).place(x=5, y=185)
+        Tkinter.Button(self.root, text='Gen Config', command=self.generate_config, width=15).place(x=5, y=215)
+        Tkinter.Button(self.root, text='Push Config', command=self.push_config, width=15).place(x=5, y=245)
+        Tkinter.Button(self.root, text='Run Tests', command=self.run_tests, width=15).place(x=5, y=275)
 
         self.text_box = ScrolledText.ScrolledText(self.root, width=59, height=24, font=('Helvetica', 9))
         self.text_box.place(x=162, y=5)
@@ -94,6 +100,18 @@ class Application:
         f = tkFileDialog.askopenfile(parent=self.root, initialdir='./', title='Select a Config File')
         self.config = f.read()
 
+    def uploadtest_script(self):
+        self.clear_window()
+        f = tkFileDialog.askopenfile(parent=self.root, initialdir='./', title='Select a Config File')
+        self.config = f.read()
+        for host, port in self.hosts:
+            server = xmlrpclib.ServerProxy('http://%s:%s' % (host, port))
+            try:
+                status = server.upload_test(self.config)
+                self.text_box.insert(Tkinter.END, '%s:%s config updated:\n%s\n\n' % (host, port, status))
+            except socket.error:
+                self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
+
     def push_config(self):
         self.clear_window()
         try:
@@ -106,27 +124,45 @@ class Application:
             try:
                 status = server.update_config(self.config)
                 self.text_box.insert(Tkinter.END, '%s:%s config updated:\n%s\n\n' % (host, port, status))
+                self.script = "uploaded_test.py"
+                self.generate_config()
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
 
+    def user_groups(self):
+        groups = {}
+        for i in xrange(self.groups):
+            group_name = "user_group"+str(i)
+            group = { 
+                group_name: {
+                    "threads": self.num_clients / self.groups,
+                    "script": self.script
+                    }
+            }
+            groups.update(group)
+        return groups
 
     def generate_config(self):
         self.clear_window()
         run_time, rampup, num_clients = self.run_time,self.rampup,self.num_clients
-        config_template=string.Template("""        
-[global]
-run_time = $run_time
-rampup = $rampup
-results_ts_interval = 10
-progress_bar = off
-console_logging = off
-xml_report = off
-
-[user_group-1]
-threads = $num_clients
-script = apiclient.py
-        """)
-        config = config_template.substitute(locals())
+        global_config = { "global":
+                            {
+                                "run_time":self.run_time,
+                                "rampup": self.rampup,
+                                "results_ts_interval": self.results_ts_interval,
+                                "progress_bar": self.progress_bar,
+                                "console_logging": self.console_logging,
+                                "xml_report":self.xml_report
+                            }}
+        gen_config = self.user_groups()
+        gen_config.update(global_config)
+        config = ""
+        for k,v in gen_config.items():
+            config += "["+str(k)+"]\n"
+            if isinstance(v,dict):
+                for name,value in v.items():
+                    config += str(name)+" = "+str(value)+"\n"
+            config += "\n"
         self.text_box.insert(Tkinter.END, config )
         self.config = config
         self.text_box.insert(Tkinter.END, "Config Stored in Memory, click Push to update")
@@ -178,12 +214,16 @@ def main():
                   help="Runtime duration in seconds")
     parser.add_option("-r", "--rampup", dest="rampup",
                   help="Duration to start total number of clients")
+    parser.add_option("-s", "--script", dest="script",default="apiclient.py",
+                  help="Define script name default apiclient.py")    
+    parser.add_option("-g", "--groups", dest="groups",default=1,
+                  help="Define number of thread groups per node, default 1") 
     (options, args) = parser.parse_args()
     if not (options.NODES or options.clients or options.run_time or options.rampup):
         parser.error("Required Field Missing!")
     hosts = [(host_port.split(':')[0], host_port.split(':')[1]) for host_port in options.NODES.split(',')]
     root = Tkinter.Tk()
-    app = Application(root,hosts,options.clients,options.run_time,options.rampup)
+    app = Application(root,hosts,options.clients,options.run_time,options.rampup,script=options.script,groups=int(options.groups))
     root.mainloop()
 
 

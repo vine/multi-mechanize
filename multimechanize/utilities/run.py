@@ -72,7 +72,7 @@ def main():
 def run_test(project_name, cmd_opts, remote_starter=None):
     if remote_starter is not None:
         remote_starter.test_running = True
-        remote_starter.output_dir = None
+        #remote_starter.output_dir = None
 
     run_time, rampup, results_ts_interval, console_logging, progress_bar, results_database, post_run_script, xml_report, user_group_configs = configure(project_name, cmd_opts)
 
