@@ -42,9 +42,10 @@ class RemoteControl(object):
         self.cmd_opts = cmd_opts
         self.test_running = False
         self.output_dir = None
+        self.thread = False
 
     def run_test(self):
-        if self.test_running:
+        if self.check_test_running():
             return 'Test Already Running'
         else:
             self.thread = TestThread(self.project_name, self.cmd_opts,self.run_callback,self)

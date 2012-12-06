@@ -43,7 +43,7 @@ class Application:
         self.groups = groups
         self.clients = int(clients)
         self.run_time = int(run_time)
-        self.script = script
+        self.script = script        
         self.rampup = int(rampup)
         self.num_clients = self.clients
         self.root.geometry('%dx%d%+d%+d' % (600, 400, 100, 100))
@@ -52,6 +52,7 @@ class Application:
         self.progress_bar = "on"
         self.console_logging = "off"
         self.xml_report = "off"
+        self.start_time = 0
         self.results_directory = results_dir
         if not re.match('/$',self.results_directory):
             self.results_directory += "/"
@@ -65,9 +66,9 @@ class Application:
         Tkinter.Button(self.root, text='Gen Config', command=self.generate_config, width=15).place(x=5, y=215)
         Tkinter.Button(self.root, text='Push Config', command=self.push_config, width=15).place(x=5, y=245)
         Tkinter.Button(self.root, text='Run Tests', command=self.run_tests, width=15).place(x=5, y=275)
-
         self.text_box = ScrolledText.ScrolledText(self.root, width=59, height=24, font=('Helvetica', 9))
         self.text_box.place(x=162, y=5)
+        self.uploadtest_script(initial=True)
 
 
     def clear_window(self):
@@ -87,19 +88,15 @@ class Application:
             try:
                 status = server.run_test()
                 self.text_box.insert(Tkinter.END, '%s:%s:\n%s\n\n\n' % (host, port, status))
+                self.start_time = time.time()
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
-        count = 0
-        while count < self.run_time:
-            self.clear_window()
-            count_down = self.run_time - count
-            self.text_box.insert(Tkinter.END, '%s seconds left until test complete' % (count_down))
-            count += 1
-            if count%5==0:
-                if not self.check_servers():
-                    self.text_box.insert(Tkinter.END, 'At least one of the node completed their tests')
-                    break
-            time.sleep(1)
+
+    def time_remaining(self):
+        if not self.start_time == 0:
+            time_left = self.run_time - (time.time() - self.start_time)
+            self.text_box.insert(Tkinter.END, '%s seconds left until test complete' % (time_left))
+
 
 
     def get_configs(self):
@@ -118,9 +115,12 @@ class Application:
         f = tkFileDialog.askopenfile(parent=self.root, initialdir='./', title='Select a Config File')
         self.config = f.read()
 
-    def uploadtest_script(self):
+    def uploadtest_script(self,initial=False):
         self.clear_window()
-        f = tkFileDialog.askopenfile(parent=self.root, initialdir='./', title='Select a Config File')
+        if initial and os.path.exists(self.script):
+            f = open(self.script, 'r')
+        else:
+            f = tkFileDialog.askopenfile(parent=self.root, initialdir='./', title='Select a Config File')
         self.test_script = f.read()
         for host, port in self.hosts:
             server = xmlrpclib.ServerProxy('http://%s:%s' % (host, port))
@@ -231,6 +231,7 @@ class Application:
                 is_running = server.check_test_running()
                 self.text_box.insert(Tkinter.END, '%s:%s test running:\n%s\n\n' % (host, port, is_running))
                 still_running = is_running
+                self.time_remaining()
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
         return still_running
