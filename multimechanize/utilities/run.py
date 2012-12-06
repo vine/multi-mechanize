@@ -45,6 +45,7 @@ def main():
     parser.add_option('-r', '--results', dest='results_dir', help='results directory to reprocess')
     parser.add_option('-b', '--bind-addr', dest='bind_addr', help='rpc bind address', default='localhost')
     parser.add_option('-d', '--directory', dest='projects_dir', help='directory containing project folder', default='.')
+    parser.add_option('-f', '--fork', dest='fork',action="store_true",default=False, help='Fork into background')
     cmd_opts, args = parser.parse_args()
 
     try:
@@ -62,7 +63,13 @@ def main():
         rerun_results(project_name, cmd_opts, cmd_opts.results_dir)
     elif cmd_opts.port:
         import multimechanize.rpcserver
-        multimechanize.rpcserver.launch_rpc_server(cmd_opts.bind_addr, cmd_opts.port,project_name, cmd_opts,run_test)
+        if cmd_opts.fork:
+            fork = multiprocessing.Process(target=multimechanize.rpcserver.launch_rpc_server,args=(cmd_opts.bind_addr, cmd_opts.port,project_name, cmd_opts,run_test))
+            fork.daemon = True
+            fork.start()
+        else:
+            multimechanize.rpcserver.launch_rpc_server(cmd_opts.bind_addr, cmd_opts.port,project_name, cmd_opts,run_test)
+
     else:
         run_test(project_name, cmd_opts)
     return
@@ -72,7 +79,7 @@ def main():
 def run_test(project_name, cmd_opts, remote_starter=None):
     if remote_starter is not None:
         remote_starter.test_running = True
-        #remote_starter.output_dir = None
+        remote_starter.output_dir = None
 
     run_time, rampup, results_ts_interval, console_logging, progress_bar, results_database, post_run_script, xml_report, user_group_configs = configure(project_name, cmd_opts)
 
@@ -128,6 +135,9 @@ def run_test(project_name, cmd_opts, remote_starter=None):
                 else:
                     print 'waiting for all requests to finish...\r'
                     sys.stdout.write(chr(27) + '[A' )
+            for thread in user_groups:
+                thread.join(1)
+                thread.is_alive()
             time.sleep(.5)
 
         if not sys.platform.startswith('win'):

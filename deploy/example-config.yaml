@@ -1,0 +1,16 @@
+aws:
+    access_id: "............."
+    secret_key: "................"
+    ami: "ami-.............."
+    node_size: "c1.medium"
+    groups: [ "group1","group2" ]
+    ssh_key: "keyname"
+
+test_config:
+    clients_per_node: 6000
+    ssh_user: "....."
+    ssh_key: "/home/username/.ssh/....."
+    clients: 100
+    rampup: 12
+    run_time: 300
+    script: "......py"

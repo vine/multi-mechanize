@@ -105,13 +105,14 @@ class Agent(threading.Thread):
         while elapsed < self.run_time:
             error = ''
             start = self.default_timer()
-
             try:
                 trans.run()
             except Exception, e:  # test runner catches all script exceptions here
                 error = str(e).replace(',', '')
-
-            finish = self.default_timer()
+            if trans.sleep:
+                finish = self.default_timer() - int(trans.sleep)
+            else:
+                finish = self.default_timer()
 
             scriptrun_time = finish - start
             elapsed = time.time() - self.start_time

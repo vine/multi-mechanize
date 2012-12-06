@@ -20,6 +20,8 @@ import tkFileDialog
 import xmlrpclib
 import sys
 import string
+import os
+import multimechanize.results as results
 from optparse import OptionParser
 
 
@@ -33,7 +35,7 @@ NODES = [
 
 
 class Application:
-    def __init__(self, root, hosts,clients,run_time,rampup = 30,script = "apiclient.py",groups = 1):
+    def __init__(self, root, hosts,clients,run_time,rampup = 30,script = "apiclient.py",groups = 1,results_dir = "/tmp/multimech/"):
         self.hosts = hosts
         self.root = root
         self.groups = groups
@@ -41,13 +43,16 @@ class Application:
         self.run_time = int(run_time)
         self.script = script
         self.rampup = int(rampup)
-        self.num_clients = (self.clients / len(self.hosts))
+        self.num_clients = self.clients
         self.root.geometry('%dx%d%+d%+d' % (600, 400, 100, 100))
         self.root.title('Multi-Mechanize Grid Controller')
         self.results_ts_interval = 10
         self.progress_bar = "on"
         self.console_logging = "off"
         self.xml_report = "off"
+        self.results_directory = results_dir
+        if not re.match('/$',self.results_dir):
+            self.results_dir += "/"
         Tkinter.Button(self.root, text='List Nodes', command=self.list_nodes, width=15,).place(x=5, y=5)
         Tkinter.Button(self.root, text='Check Tests', command=self.check_servers, width=15,).place(x=5, y=35)
         Tkinter.Button(self.root, text='Get Project Names', command=self.get_project_names, width=15).place(x=5, y=65)
@@ -103,12 +108,14 @@ class Application:
     def uploadtest_script(self):
         self.clear_window()
         f = tkFileDialog.askopenfile(parent=self.root, initialdir='./', title='Select a Config File')
-        self.config = f.read()
+        self.test_script = f.read()
         for host, port in self.hosts:
             server = xmlrpclib.ServerProxy('http://%s:%s' % (host, port))
             try:
-                status = server.upload_test(self.config)
+                status = server.upload_test(self.test_script)
                 self.text_box.insert(Tkinter.END, '%s:%s config updated:\n%s\n\n' % (host, port, status))
+                self.script = "uploaded_test.py"
+                self.generate_config()
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
 
@@ -124,8 +131,6 @@ class Application:
             try:
                 status = server.update_config(self.config)
                 self.text_box.insert(Tkinter.END, '%s:%s config updated:\n%s\n\n' % (host, port, status))
-                self.script = "uploaded_test.py"
-                self.generate_config()
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
 
@@ -170,13 +175,27 @@ class Application:
 
     def get_results(self):
         self.clear_window()
+        self.all_results = ""
         for host, port in self.hosts:
             server = xmlrpclib.ServerProxy('http://%s:%s' % (host, port))
             try:
                 results = server.get_results()
                 self.text_box.insert(Tkinter.END, '%s:%s results:\n%s\n\n\n' % (host, port, results))
+                self.all_results += results
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
+
+        if not os.path.exists(self.results_directory):
+            os.makedirs(self.results_directory)
+        with open('%sresults.csv' % (self.results_directory), 'w') as f:
+            f.write(self.all_results)
+        self.generate_html()
+        return True
+
+    def generate_html(self):
+        self.text_box.insert(Tkinter.END, '\n\nanalyzing results...\n')
+        results.output_results(self.results_directory, 'results.csv', self.run_time, self.rampup, self.results_ts_interval)
+        self.text_box.insert(Tkinter.END, 'created: %sresults.html\n' % self.results_directory)
 
 
     def get_project_names(self):
@@ -205,11 +224,12 @@ def usage():
     print "Usage: "+sys.argv[0]+"--nodes=num --rampup=num --clients=num --run_time=num"
 
 def main():
+
     parser = OptionParser()
     parser.add_option("-n", "--nodes", dest="NODES",
                   help="a comma seperated list of host:port")
     parser.add_option("-c", "--clients", dest="clients",
-                  help="Total Number of clients")
+                  help="Total Number of clients per node")
     parser.add_option("-t", "--run_time", dest="run_time",
                   help="Runtime duration in seconds")
     parser.add_option("-r", "--rampup", dest="rampup",
@@ -217,13 +237,15 @@ def main():
     parser.add_option("-s", "--script", dest="script",default="apiclient.py",
                   help="Define script name default apiclient.py")    
     parser.add_option("-g", "--groups", dest="groups",default=1,
-                  help="Define number of thread groups per node, default 1") 
+                  help="Define number of thread groups per node, default 1")
+    parser.add_option("-rd", "--results_dir", dest="results_dir",default='/tmp/multimech/',
+              help="Define where the results appear, default /tmp/multimech/")
     (options, args) = parser.parse_args()
     if not (options.NODES or options.clients or options.run_time or options.rampup):
         parser.error("Required Field Missing!")
     hosts = [(host_port.split(':')[0], host_port.split(':')[1]) for host_port in options.NODES.split(',')]
     root = Tkinter.Tk()
-    app = Application(root,hosts,options.clients,options.run_time,options.rampup,script=options.script,groups=int(options.groups))
+    app = Application(root,hosts,options.clients,options.run_time,options.rampup,script=options.script,groups=int(options.groups),results_dir=options.results_dir)
     root.mainloop()
 
 

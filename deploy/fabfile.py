@@ -27,3 +27,12 @@ def deploy():
         with settings(hide('stdout', 'stderr'), warn_only=True):
             sudo('python /tmp/%s/setup.py install' % dist)
     sudo('rm -Rf /tmp/%s' % dist)
+
+@task
+def build_newproject():
+    run('multimech-newproject ~/vineproject')
+
+@task
+def start_mech():
+   with cd('~/'):
+       run('nohup multimech-run -b 0.0.0.0 -p 8001 vineproject &')
