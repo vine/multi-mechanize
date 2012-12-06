@@ -135,6 +135,15 @@ def launchAwsNodes(config):
 	instances = conn.start_instances(config['aws']['ami'],config['aws']['node_size'],config['aws']['groups'],config['aws']['ssh_key'],num)
 	return { 'conn': conn,'instances': instances, 'num_nodes': num}
 
+def print_execstring(launch_array):
+	string = ""
+	append = " "
+	for i in xrange(len(launch_array)):
+		if i == len(launch_array):
+			append = ""
+		string += "%s%s" % (launch_array[i],append)
+	print string
+
 def launchGridUI(config,aws_res):
 	test_config = config['test_config']
 	client_float = round(float((test_config['clients'] / aws_res['num_nodes'])))
@@ -142,7 +151,12 @@ def launchGridUI(config,aws_res):
 	rampup = test_config['rampup']
 	run_time = test_config['run_time']
 	script = test_config['script']
-	call(['multimech-gridgui', '--nodes=%s ' % (get_hoststring(aws_res['conn'].get_host_list())), '--clients= %s' % (num_clients), '--rampup=%s' % rampup, '--run_time=%s' % run_time,'--script="%s"' % script])
+	results_dir = test_config['results_dir']
+	launch_array = ['multimech-gridgui', '--nodes=%s ' % (get_hoststring(aws_res['conn'].get_host_list())), '--clients=%s' % (num_clients), '--rampup=%s' % rampup, '--run_time=%s' % run_time,'--script="%s"' % script, '--results_dir=%s' % results_dir]
+	call(launch_array)
+	print "Exec Grid UI again with this string:"
+	print_execstring(launch_array)
+
 
 def wait_for_ssh(hosts):
 	for host in hosts:

@@ -20,7 +20,9 @@ import tkFileDialog
 import xmlrpclib
 import sys
 import string
+import re
 import os
+import time
 import multimechanize.results as results
 from optparse import OptionParser
 
@@ -51,8 +53,8 @@ class Application:
         self.console_logging = "off"
         self.xml_report = "off"
         self.results_directory = results_dir
-        if not re.match('/$',self.results_dir):
-            self.results_dir += "/"
+        if not re.match('/$',self.results_directory):
+            self.results_directory += "/"
         Tkinter.Button(self.root, text='List Nodes', command=self.list_nodes, width=15,).place(x=5, y=5)
         Tkinter.Button(self.root, text='Check Tests', command=self.check_servers, width=15,).place(x=5, y=35)
         Tkinter.Button(self.root, text='Get Project Names', command=self.get_project_names, width=15).place(x=5, y=65)
@@ -87,6 +89,17 @@ class Application:
                 self.text_box.insert(Tkinter.END, '%s:%s:\n%s\n\n\n' % (host, port, status))
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
+        count = 0
+        while count < self.run_time:
+            self.clear_window()
+            count_down = self.run_time - count
+            self.text_box.insert(Tkinter.END, '%s seconds left until test complete' % (count_down))
+            count += 1
+            if count%5==0:
+                if not self.check_servers():
+                    self.text_box.insert(Tkinter.END, 'At least one of the node completed their tests')
+                    break
+            time.sleep(1)
 
 
     def get_configs(self):
@@ -211,14 +224,16 @@ class Application:
 
     def check_servers(self):
         self.clear_window()
+        still_running = False
         for host, port in self.hosts:
             server = xmlrpclib.ServerProxy('http://%s:%s' % (host, port))
             try:
                 is_running = server.check_test_running()
                 self.text_box.insert(Tkinter.END, '%s:%s test running:\n%s\n\n' % (host, port, is_running))
+                still_running = is_running
             except socket.error:
                 self.text_box.insert(Tkinter.END, 'can not make connection to: %s:%s\n' % (host, port))
-
+        return still_running
 
 def usage():
     print "Usage: "+sys.argv[0]+"--nodes=num --rampup=num --clients=num --run_time=num"
@@ -238,7 +253,7 @@ def main():
                   help="Define script name default apiclient.py")    
     parser.add_option("-g", "--groups", dest="groups",default=1,
                   help="Define number of thread groups per node, default 1")
-    parser.add_option("-rd", "--results_dir", dest="results_dir",default='/tmp/multimech/',
+    parser.add_option("-d","--results_dir", dest="results_dir",default='/tmp/multimech/',
               help="Define where the results appear, default /tmp/multimech/")
     (options, args) = parser.parse_args()
     if not (options.NODES or options.clients or options.run_time or options.rampup):

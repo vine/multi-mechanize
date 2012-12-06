@@ -13,4 +13,5 @@ test_config:
     clients: 100
     rampup: 12
     run_time: 300
+    results_dir: "/home/leigh/multimech-results"
     script: "......py"
